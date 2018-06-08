@@ -17,7 +17,8 @@
 /* Includes ------------------------------------------------------------------*/
 #include <setjmp.h>
 #include <EEPROM.h>
-#include <Servo.h>    //to define and control servos
+#include "Tlc5940.h"
+#include "tlc_servos.h"
 #include "FlexiTimer2.h"//to set a timer to manage all servos
 #include "GoBLE.h"
 
@@ -25,7 +26,6 @@
 #define EEPROM_OFFSET 2   //eeprom starting offset to store servo offset of calibration
 /* Servos --------------------------------------------------------------------*/
 //define 12 servos for 4 legs
-Servo servo[4][3];
 //define servos' ports
 const int servo_pin[4][3] = { {2, 3, 4}, {5, 6, 7}, {8, 9, 10}, {11, 12, 13} };
 int servo_error[4][3] = { {0, 0, 0}, {0, 0, 0}, {0, 0, 0}, {0, 0, 0} }; // angle trim offset for servo derivation in polar_to_servo
@@ -117,6 +117,9 @@ void setup()
 {
   //start serial for debug
   Serial.begin(115200); // baud rate chosen for bluetooth compatability
+
+  tlc_initServos();
+  
   //
   int val = EEPROMReadWord(0);
   if (val != EEPROM_MAGIC) {
@@ -139,8 +142,7 @@ void setup()
   {
     for (int j = 0; j < 3; j++)
     {
-      site_now[i][j] = site_expect[i][j];
-      servo[i][j].attach(servo_pin[i][j]);
+      site_now[i][j] = site_expect[i][j];      
     }
   }
   calib_servo();
@@ -171,10 +173,13 @@ void calib_servo(void)
   pinMode(CAL_TRIGGER_PIN, INPUT);
   if (digitalRead(CAL_TRIGGER_PIN)) {
     for (int i = 0; i < 4; i++) {
-      servo[i][femur_servo_index].write(90 + servo_error[i][femur_servo_index]);
-      servo[i][tibia_servo_index].write(90 + servo_error[i][tibia_servo_index]);
-      servo[i][coxa_servo_index].write(90 + servo_error[i][coxa_servo_index]);
+      
+      tlc_setServo(servo_pin[i][femur_servo_index],90 + servo_error[i][femur_servo_index]);
+      tlc_setServo(servo_pin[i][tibia_servo_index],90 + servo_error[i][tibia_servo_index]);
+      tlc_setServo(servo_pin[i][coxa_servo_index],90 + servo_error[i][coxa_servo_index]);      
     }
+    Tlc.update();
+    
     while (digitalRead(CAL_TRIGGER_PIN)) delay(1000);
   }
 }
@@ -1599,9 +1604,11 @@ void polar_to_servo(int leg, float alpha, float beta, float gamma)
     //    Serial.println("A, "+String(leg)+","+String(alpha)+","+String(beta)+","+String(gamma));
   }
 
-  servo[leg][femur_servo_index].write(alpha + servo_error[leg][femur_servo_index]);
-  servo[leg][tibia_servo_index].write(beta + servo_error[leg][tibia_servo_index]);
-  servo[leg][coxa_servo_index].write(gamma + servo_error[leg][coxa_servo_index]);
+
+  tlc_setServo(servo_pin[leg][femur_servo_index],alpha + servo_error[leg][femur_servo_index]);
+  tlc_setServo(servo_pin[leg][tibia_servo_index],beta + servo_error[leg][tibia_servo_index]);
+  tlc_setServo(servo_pin[leg][coxa_servo_index],gamma + servo_error[leg][coxa_servo_index]);
+  Tlc.update();
 
 }
 
